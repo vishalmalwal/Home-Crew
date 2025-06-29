@@ -103,6 +103,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     initializeApp();
+    
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        const userData = session.user.user_metadata;
+        const user: User = {
+          id: session.user.id,
+          name: userData.name || session.user.email?.split('@')[0] || 'User',
+          email: session.user.email || '',
+          phone: userData.phone || '',
+          role: userData.role || 'customer'
+        };
+        setCurrentUser(user);
+        await refreshData();
+      } else if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+        setBookings([]);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const initializeApp = async () => {
@@ -112,13 +133,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           const userData = session.user.user_metadata;
-          setCurrentUser({
+          const user: User = {
             id: session.user.id,
             name: userData.name || session.user.email?.split('@')[0] || 'User',
             email: session.user.email || '',
             phone: userData.phone || '',
             role: userData.role || 'customer'
-          });
+          };
+          setCurrentUser(user);
         }
         await refreshData();
       } else {
@@ -181,8 +203,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             role: 'company'
           };
           setCurrentUser(user);
+          setLoading(false);
           return true;
         }
+        setLoading(false);
         return false;
       }
 
@@ -193,7 +217,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           password
         });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Company login error:', error);
+          setLoading(false);
+          return false;
+        }
 
         if (data.user) {
           const user: User = {
@@ -205,6 +233,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
           setCurrentUser(user);
           await refreshData();
+          setLoading(false);
           return true;
         }
       } else if (role === 'customer') {
@@ -214,7 +243,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           password
         });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Customer login error:', error);
+          setLoading(false);
+          return false;
+        }
 
         if (data.user) {
           const userData = data.user.user_metadata;
@@ -227,16 +260,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
           setCurrentUser(user);
           await refreshData();
+          setLoading(false);
           return true;
         }
       }
 
+      setLoading(false);
       return false;
     } catch (error) {
       console.error('Login error:', error);
-      return false;
-    } finally {
       setLoading(false);
+      return false;
     }
   };
 
@@ -252,7 +286,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!isSupabaseConfigured()) {
       return { 
         success: true, 
-        message: 'Demo mode: Use admin@homecrew.com / admin123 for company login or any email/password for customer login.' 
+        message: 'Demo mode: Registration successful! You can now login with any email/password combination.' 
       };
     }
 
@@ -265,17 +299,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             name: userData.name,
             phone: userData.phone,
             role: 'customer'
-          }
+          },
+          emailRedirectTo: `${window.location.origin}/login`
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Registration error:', error);
+        return { 
+          success: false, 
+          message: error.message || 'Registration failed. Please try again.' 
+        };
+      }
+
+      if (data.user && !data.user.email_confirmed_at) {
+        return { 
+          success: true, 
+          message: 'Registration successful! Please check your email and click the confirmation link, then login.' 
+        };
+      }
 
       return { 
         success: true, 
-        message: 'Registration successful! Please check your email to verify your account, then login.' 
+        message: 'Registration successful! You can now login.' 
       };
     } catch (error: any) {
+      console.error('Registration error:', error);
       return { 
         success: false, 
         message: error.message || 'Registration failed. Please try again.' 
