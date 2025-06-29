@@ -143,6 +143,9 @@ const sendEmail = (to: string, subject: string, body: string) => {
   console.log(`📧 Subject: ${subject}`);
   console.log(`📧 Body: ${body}`);
   console.log('---');
+  
+  // Show browser alert to simulate email
+  alert(`📧 Email sent to ${to}\n\nSubject: ${subject}\n\n${body}`);
 };
 
 const generateVerificationCode = () => {
@@ -235,7 +238,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     sendEmail(
       userData.email,
       'HomeCrew - Email Verification',
-      `Welcome to HomeCrew! Your verification code is: ${verificationCode}`
+      `Welcome to HomeCrew!\n\nYour verification code is: ${verificationCode}\n\nPlease enter this code on the verification page to complete your registration.\n\nThank you for choosing HomeCrew!`
     );
 
     return { success: true, message: 'Registration successful! Please check your email for verification code.' };
@@ -295,11 +298,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         : b
     ));
 
+    // Get worker phone number
+    const worker = workers.find(w => w.id === booking.workerId);
+    const workerPhone = worker ? worker.phone : 'Contact company for details';
+
     // Send confirmation email to customer
     sendEmail(
       booking.customerEmail,
-      'HomeCrew - Booking Confirmed',
-      `Your booking has been confirmed!\n\nBooking ID: ${bookingId}\nService: ${booking.service}\nWorker: ${booking.workerName}\nWorker Phone: ${booking.workerName === 'Rajesh Kumar' ? '+91-9876543210' : booking.workerName === 'Suresh Sharma' ? '+91-9876543211' : booking.workerName === 'Amit Patel' ? '+91-9876543212' : '+91-9876543213'}\nDate: ${booking.date}\nTime: ${booking.timeSlot}\n\nThe worker will arrive at your location on time. Thank you for choosing HomeCrew!`
+      'HomeCrew - Booking Confirmed ✅',
+      `Your booking has been confirmed!\n\nBooking Details:\n• Booking ID: ${bookingId}\n• Service: ${booking.service} - ${booking.problem}\n• Worker: ${booking.workerName}\n• Worker Phone: ${workerPhone}\n• Date: ${booking.date}\n• Time: ${booking.timeSlot}\n• Address: ${booking.address}\n\nThe worker will arrive at your location on the scheduled time. Please ensure someone is available to receive the service.\n\nThank you for choosing HomeCrew!`
     );
   };
 

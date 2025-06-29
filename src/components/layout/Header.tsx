@@ -12,6 +12,38 @@ const Header: React.FC = () => {
     navigate('/');
   };
 
+  // Company header - minimal with just logout
+  if (currentUser?.role === 'company') {
+    return (
+      <header className="bg-white shadow-lg border-b-2 border-orange-100">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <Link to="/" className="flex items-center space-x-3">
+              <div className="bg-gradient-to-r from-orange-600 to-red-600 p-2 rounded-lg">
+                <Building className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+                  HomeCrew Admin
+                </h1>
+                <p className="text-sm text-gray-600">Company Management Portal</p>
+              </div>
+            </Link>
+
+            <button
+              onClick={handleLogout}
+              className="flex items-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Logout</span>
+            </button>
+          </div>
+        </div>
+      </header>
+    );
+  }
+
+  // Customer header - full navigation
   return (
     <header className="bg-white shadow-lg border-b-2 border-blue-100">
       <div className="max-w-7xl mx-auto px-4 py-4">
@@ -59,15 +91,6 @@ const Header: React.FC = () => {
                   >
                     <Settings className="w-4 h-4" />
                     <span>Dashboard</span>
-                  </Link>
-                )}
-                {currentUser.role === 'company' && (
-                  <Link
-                    to="/admin"
-                    className="flex items-center space-x-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors"
-                  >
-                    <Settings className="w-4 h-4" />
-                    <span>Admin Panel</span>
                   </Link>
                 )}
                 <button
