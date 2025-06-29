@@ -104,26 +104,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     initializeApp();
     
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        const userData = session.user.user_metadata;
-        const user: User = {
-          id: session.user.id,
-          name: userData.name || session.user.email?.split('@')[0] || 'User',
-          email: session.user.email || '',
-          phone: userData.phone || '',
-          role: userData.role || 'customer'
-        };
-        setCurrentUser(user);
-        await refreshData();
-      } else if (event === 'SIGNED_OUT') {
-        setCurrentUser(null);
-        setBookings([]);
-      }
-    });
+    if (isSupabaseConfigured()) {
+      // Listen for auth state changes
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          const userData = session.user.user_metadata;
+          const user: User = {
+            id: session.user.id,
+            name: userData.name || session.user.email?.split('@')[0] || 'User',
+            email: session.user.email || '',
+            phone: userData.phone || '',
+            role: userData.role || (session.user.email === 'admin@homecrew.com' ? 'company' : 'customer')
+          };
+          setCurrentUser(user);
+          await refreshData();
+        } else if (event === 'SIGNED_OUT') {
+          setCurrentUser(null);
+          setBookings([]);
+        }
+      });
 
-    return () => subscription.unsubscribe();
+      return () => subscription.unsubscribe();
+    }
   }, []);
 
   const initializeApp = async () => {
@@ -138,12 +140,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             name: userData.name || session.user.email?.split('@')[0] || 'User',
             email: session.user.email || '',
             phone: userData.phone || '',
-            role: userData.role || 'customer'
+            role: userData.role || (session.user.email === 'admin@homecrew.com' ? 'company' : 'customer')
           };
           setCurrentUser(user);
         }
         await refreshData();
       } else {
+        console.log('Supabase not configured, using demo mode');
         // Use mock data for demo
         setWorkers(mockWorkers);
       }
@@ -166,8 +169,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (workersError) throw workersError;
-      setWorkers(workersData || []);
+      if (workersError) {
+        console.error('Error fetching workers:', workersError);
+        // Use mock data as fallback
+        setWorkers(mockWorkers);
+      } else {
+        setWorkers(workersData || []);
+      }
 
       // Fetch bookings if user is logged in
       if (currentUser) {
@@ -180,11 +188,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const { data: bookingsData, error: bookingsError } = await bookingsQuery
           .order('created_at', { ascending: false });
 
-        if (bookingsError) throw bookingsError;
-        setBookings(bookingsData || []);
+        if (bookingsError) {
+          console.error('Error fetching bookings:', bookingsError);
+        } else {
+          setBookings(bookingsData || []);
+        }
       }
     } catch (error) {
       console.error('Error fetching data:', error);
+      // Use mock data as fallback
+      setWorkers(mockWorkers);
     }
   };
 
@@ -193,10 +206,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     try {
       if (!isSupabaseConfigured()) {
-        // Demo mode
-        if (role === 'company' && email === 'admin@homecrew.com' && password === 'admin123') {
+        // Demo mode - allow any login
+        console.log('Demo mode login');
+        
+        if (role === 'company' && email === 'admin@homecrew.com') {
           const user: User = {
-            id: 'admin-id',
+            id: 'demo-admin',
             name: 'HomeCrew Admin',
             email: 'admin@homecrew.com',
             phone: '+91-1234567890',
@@ -205,64 +220,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setCurrentUser(user);
           setLoading(false);
           return true;
+        } else if (role === 'customer') {
+          // Allow any customer login in demo mode
+          const user: User = {
+            id: 'demo-customer',
+            name: email.split('@')[0] || 'Demo User',
+            email: email,
+            phone: '+91-9999999999',
+            role: 'customer'
+          };
+          setCurrentUser(user);
+          setLoading(false);
+          return true;
         }
+        
         setLoading(false);
         return false;
       }
 
-      // Company admin login
-      if (role === 'company' && email === 'admin@homecrew.com') {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
+      // Real Supabase login
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
 
-        if (error) {
-          console.error('Company login error:', error);
+      if (error) {
+        console.error('Login error:', error);
+        setLoading(false);
+        return false;
+      }
+
+      if (data.user) {
+        // Check if user role matches expected role
+        const userData = data.user.user_metadata;
+        const userRole = userData.role || (data.user.email === 'admin@homecrew.com' ? 'company' : 'customer');
+        
+        if (userRole !== role) {
+          await supabase.auth.signOut();
           setLoading(false);
           return false;
         }
 
-        if (data.user) {
-          const user: User = {
-            id: data.user.id,
-            name: 'HomeCrew Admin',
-            email: data.user.email || '',
-            phone: '+91-1234567890',
-            role: 'company'
-          };
-          setCurrentUser(user);
-          await refreshData();
-          setLoading(false);
-          return true;
-        }
-      } else if (role === 'customer') {
-        // Customer login
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
-
-        if (error) {
-          console.error('Customer login error:', error);
-          setLoading(false);
-          return false;
-        }
-
-        if (data.user) {
-          const userData = data.user.user_metadata;
-          const user: User = {
-            id: data.user.id,
-            name: userData.name || data.user.email?.split('@')[0] || 'User',
-            email: data.user.email || '',
-            phone: userData.phone || '',
-            role: 'customer'
-          };
-          setCurrentUser(user);
-          await refreshData();
-          setLoading(false);
-          return true;
-        }
+        const user: User = {
+          id: data.user.id,
+          name: userData.name || data.user.email?.split('@')[0] || 'User',
+          email: data.user.email || '',
+          phone: userData.phone || '',
+          role: userRole
+        };
+        setCurrentUser(user);
+        await refreshData();
+        setLoading(false);
+        return true;
       }
 
       setLoading(false);
@@ -299,8 +308,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             name: userData.name,
             phone: userData.phone,
             role: 'customer'
-          },
-          emailRedirectTo: `${window.location.origin}/login`
+          }
         }
       });
 
@@ -312,16 +320,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       }
 
-      if (data.user && !data.user.email_confirmed_at) {
+      if (data.user) {
+        // Create user profile in public.users table
+        const { error: profileError } = await supabase
+          .from('users')
+          .insert([{
+            id: data.user.id,
+            name: userData.name,
+            phone: userData.phone,
+            role: 'customer'
+          }]);
+
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+        }
+
+        if (!data.user.email_confirmed_at) {
+          return { 
+            success: true, 
+            message: 'Registration successful! Please check your email and click the confirmation link, then login.' 
+          };
+        }
+
         return { 
           success: true, 
-          message: 'Registration successful! Please check your email and click the confirmation link, then login.' 
+          message: 'Registration successful! You can now login.' 
         };
       }
 
       return { 
-        success: true, 
-        message: 'Registration successful! You can now login.' 
+        success: false, 
+        message: 'Registration failed. Please try again.' 
       };
     } catch (error: any) {
       console.error('Registration error:', error);

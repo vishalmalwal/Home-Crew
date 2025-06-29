@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Users, Building, ArrowLeft } from 'lucide-react';
+import { Users, Building, ArrowLeft, Info } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
@@ -17,6 +17,13 @@ const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const { login } = useApp();
   const navigate = useNavigate();
+
+  // Check if Supabase is configured
+  const isSupabaseConfigured = () => {
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    return url && key && url !== 'https://placeholder.supabase.co' && key !== 'placeholder-key';
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +45,11 @@ const LoginPage: React.FC = () => {
           navigate('/admin');
         }
       } else {
-        setError('Invalid credentials. Please check your email and password.');
+        if (!isSupabaseConfigured()) {
+          setError('Demo mode: Invalid credentials. Try admin@homecrew.com / admin123 for company or any email for customer.');
+        } else {
+          setError('Invalid credentials. Please check your email and password.');
+        }
       }
     } catch (error) {
       setError('Login failed. Please try again.');
@@ -54,6 +65,18 @@ const LoginPage: React.FC = () => {
         <div className="flex items-center justify-center py-20">
           <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-lg">
             <h2 className="text-3xl font-bold text-center mb-8 text-gray-800">Choose Login Type</h2>
+            
+            {!isSupabaseConfigured() && (
+              <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-6">
+                <div className="flex items-start space-x-3">
+                  <Info className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="text-blue-800 font-medium">Demo Mode Active</p>
+                    <p className="text-blue-700">Supabase not configured. Using demo data.</p>
+                  </div>
+                </div>
+              </div>
+            )}
             
             <div className="space-y-4">
               <button
@@ -113,18 +136,36 @@ const LoginPage: React.FC = () => {
             </div>
           )}
 
-          {userType === 'company' && (
-            <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg mb-6 text-sm">
-              <p className="text-orange-800"><strong>Demo Company Login:</strong></p>
-              <p className="text-orange-700">Email: admin@homecrew.com</p>
-              <p className="text-orange-700">Password: admin123</p>
+          {!isSupabaseConfigured() && (
+            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-6 text-sm">
+              <div className="flex items-start space-x-3">
+                <Info className="w-5 h-5 text-blue-600 mt-0.5" />
+                <div>
+                  <p className="text-blue-800 font-medium">Demo Mode</p>
+                  {userType === 'company' ? (
+                    <div className="text-blue-700">
+                      <p>Email: admin@homecrew.com</p>
+                      <p>Password: admin123</p>
+                    </div>
+                  ) : (
+                    <p className="text-blue-700">Use any email/password to login</p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
-          {userType === 'customer' && (
+          {isSupabaseConfigured() && userType === 'company' && (
+            <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg mb-6 text-sm">
+              <p className="text-orange-800"><strong>Company Login:</strong></p>
+              <p className="text-orange-700">Use your registered company credentials</p>
+            </div>
+          )}
+
+          {isSupabaseConfigured() && userType === 'customer' && (
             <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-6 text-sm">
-              <p className="text-blue-800"><strong>Customer Registration:</strong></p>
-              <p className="text-blue-700">New customers can register for free!</p>
+              <p className="text-blue-800"><strong>Customer Login:</strong></p>
+              <p className="text-blue-700">New customers need to register first!</p>
               <Link to="/register" className="text-blue-600 hover:text-blue-800 font-medium">
                 Create your account here →
               </Link>
