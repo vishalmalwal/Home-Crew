@@ -88,9 +88,101 @@ export const PROBLEMS = {
   electrician: ['Wiring Issue', 'Fan Installation', 'Light Fitting', 'Switch Repair', 'Power Outage', 'Appliance Setup', 'Circuit Breaker', 'Socket Installation']
 };
 
+// Mock data for demo mode
+const mockWorkers: Worker[] = [
+  {
+    id: 'w1',
+    name: 'Rajesh Kumar',
+    phone: '+91-9876543210',
+    photo: '',
+    service: 'carpenter',
+    availability: true,
+    rating: 4.5,
+    total_ratings: 23,
+    city: 'Mumbai'
+  },
+  {
+    id: 'w2',
+    name: 'Suresh Sharma',
+    phone: '+91-9876543211',
+    photo: '',
+    service: 'plumber',
+    availability: true,
+    rating: 4.2,
+    total_ratings: 18,
+    city: 'Delhi'
+  },
+  {
+    id: 'w3',
+    name: 'Amit Patel',
+    phone: '+91-9876543212',
+    photo: '',
+    service: 'electrician',
+    availability: true,
+    rating: 4.8,
+    total_ratings: 31,
+    city: 'Bangalore'
+  },
+  {
+    id: 'w4',
+    name: 'Vikram Singh',
+    phone: '+91-9876543213',
+    photo: '',
+    service: 'carpenter',
+    availability: true,
+    rating: 4.0,
+    total_ratings: 12,
+    city: 'Chennai'
+  },
+  {
+    id: 'w5',
+    name: 'Ravi Gupta',
+    phone: '+91-9876543214',
+    photo: '',
+    service: 'plumber',
+    availability: true,
+    rating: 4.6,
+    total_ratings: 27,
+    city: 'Mumbai'
+  },
+  {
+    id: 'w6',
+    name: 'Deepak Yadav',
+    phone: '+91-9876543215',
+    photo: '',
+    service: 'electrician',
+    availability: true,
+    rating: 4.3,
+    total_ratings: 15,
+    city: 'Delhi'
+  },
+  {
+    id: 'w7',
+    name: 'Manoj Tiwari',
+    phone: '+91-9876543216',
+    photo: '',
+    service: 'carpenter',
+    availability: true,
+    rating: 4.7,
+    total_ratings: 19,
+    city: 'Pune'
+  },
+  {
+    id: 'w8',
+    name: 'Santosh Kumar',
+    phone: '+91-9876543217',
+    photo: '',
+    service: 'plumber',
+    availability: true,
+    rating: 4.4,
+    total_ratings: 22,
+    city: 'Bangalore'
+  }
+];
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [workers, setWorkers] = useState<Worker[]>(mockWorkers);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -107,6 +199,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (isSupabaseConfigured()) {
       // Listen for auth state changes
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log('Auth state change:', event, session?.user?.email);
+        
         if (event === 'SIGNED_IN' && session?.user) {
           const userData = session.user.user_metadata;
           const user: User = {
@@ -130,9 +224,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const initializeApp = async () => {
     try {
+      console.log('Initializing app...');
+      console.log('Supabase configured:', isSupabaseConfigured());
+      
       if (isSupabaseConfigured()) {
         // Check for existing session
         const { data: { session } } = await supabase.auth.getSession();
+        console.log('Existing session:', session?.user?.email);
+        
         if (session?.user) {
           const userData = session.user.user_metadata;
           const user: User = {
@@ -146,7 +245,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         await refreshData();
       } else {
-        console.log('Supabase not configured, using demo mode');
+        console.log('Using demo mode - Supabase not configured');
         // Use mock data for demo
         setWorkers(mockWorkers);
       }
@@ -163,6 +262,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!isSupabaseConfigured()) return;
 
     try {
+      console.log('Refreshing data...');
+      
       // Fetch workers
       const { data: workersData, error: workersError } = await supabase
         .from('workers')
@@ -174,6 +275,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Use mock data as fallback
         setWorkers(mockWorkers);
       } else {
+        console.log('Workers fetched:', workersData?.length);
         setWorkers(workersData || []);
       }
 
@@ -191,6 +293,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (bookingsError) {
           console.error('Error fetching bookings:', bookingsError);
         } else {
+          console.log('Bookings fetched:', bookingsData?.length);
           setBookings(bookingsData || []);
         }
       }
@@ -205,11 +308,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLoading(true);
     
     try {
+      console.log('Attempting login:', email, role);
+      
       if (!isSupabaseConfigured()) {
-        // Demo mode - allow any login
+        // Demo mode - allow specific logins
         console.log('Demo mode login');
         
-        if (role === 'company' && email === 'admin@homecrew.com') {
+        if (role === 'company' && email === 'admin@homecrew.com' && password === 'admin123') {
           const user: User = {
             id: 'demo-admin',
             name: 'HomeCrew Admin',
@@ -251,11 +356,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       if (data.user) {
+        console.log('Login successful:', data.user.email);
+        
         // Check if user role matches expected role
         const userData = data.user.user_metadata;
         const userRole = userData.role || (data.user.email === 'admin@homecrew.com' ? 'company' : 'customer');
         
         if (userRole !== role) {
+          console.log('Role mismatch:', userRole, 'vs', role);
           await supabase.auth.signOut();
           setLoading(false);
           return false;
@@ -284,6 +392,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logout = async (): Promise<void> => {
+    console.log('Logging out...');
     if (isSupabaseConfigured()) {
       await supabase.auth.signOut();
     }
@@ -292,7 +401,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const register = async (userData: { name: string; email: string; phone: string; password: string }): Promise<{ success: boolean; message: string }> => {
+    console.log('Attempting registration:', userData.email);
+    
     if (!isSupabaseConfigured()) {
+      console.log('Demo mode registration');
       return { 
         success: true, 
         message: 'Demo mode: Registration successful! You can now login with any email/password combination.' 
@@ -308,7 +420,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             name: userData.name,
             phone: userData.phone,
             role: 'customer'
-          }
+          },
+          emailRedirectTo: `${window.location.origin}/login`
         }
       });
 
@@ -321,6 +434,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       if (data.user) {
+        console.log('Registration successful:', data.user.email);
+        
         // Create user profile in public.users table
         const { error: profileError } = await supabase
           .from('users')
@@ -338,7 +453,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!data.user.email_confirmed_at) {
           return { 
             success: true, 
-            message: 'Registration successful! Please check your email and click the confirmation link, then login.' 
+            message: 'Registration successful! Please check your email and click the confirmation link to verify your account, then you can login.' 
           };
         }
 
@@ -570,95 +685,3 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     </AppContext.Provider>
   );
 };
-
-// Mock data for demo mode
-const mockWorkers: Worker[] = [
-  {
-    id: 'w1',
-    name: 'Rajesh Kumar',
-    phone: '+91-9876543210',
-    photo: '',
-    service: 'carpenter',
-    availability: true,
-    rating: 4.5,
-    total_ratings: 23,
-    city: 'Mumbai'
-  },
-  {
-    id: 'w2',
-    name: 'Suresh Sharma',
-    phone: '+91-9876543211',
-    photo: '',
-    service: 'plumber',
-    availability: true,
-    rating: 4.2,
-    total_ratings: 18,
-    city: 'Delhi'
-  },
-  {
-    id: 'w3',
-    name: 'Amit Patel',
-    phone: '+91-9876543212',
-    photo: '',
-    service: 'electrician',
-    availability: true,
-    rating: 4.8,
-    total_ratings: 31,
-    city: 'Bangalore'
-  },
-  {
-    id: 'w4',
-    name: 'Vikram Singh',
-    phone: '+91-9876543213',
-    photo: '',
-    service: 'carpenter',
-    availability: true,
-    rating: 4.0,
-    total_ratings: 12,
-    city: 'Chennai'
-  },
-  {
-    id: 'w5',
-    name: 'Ravi Gupta',
-    phone: '+91-9876543214',
-    photo: '',
-    service: 'plumber',
-    availability: true,
-    rating: 4.6,
-    total_ratings: 27,
-    city: 'Mumbai'
-  },
-  {
-    id: 'w6',
-    name: 'Deepak Yadav',
-    phone: '+91-9876543215',
-    photo: '',
-    service: 'electrician',
-    availability: true,
-    rating: 4.3,
-    total_ratings: 15,
-    city: 'Delhi'
-  },
-  {
-    id: 'w7',
-    name: 'Manoj Tiwari',
-    phone: '+91-9876543216',
-    photo: '',
-    service: 'carpenter',
-    availability: true,
-    rating: 4.7,
-    total_ratings: 19,
-    city: 'Pune'
-  },
-  {
-    id: 'w8',
-    name: 'Santosh Kumar',
-    phone: '+91-9876543217',
-    photo: '',
-    service: 'plumber',
-    availability: true,
-    rating: 4.4,
-    total_ratings: 22,
-    city: 'Bangalore'
-  }
-];

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, ArrowLeft } from 'lucide-react';
+import { User, ArrowLeft, Info, CheckCircle, AlertCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
@@ -18,6 +18,13 @@ const RegisterPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const { register } = useApp();
   const navigate = useNavigate();
+
+  // Check if Supabase is configured
+  const isSupabaseConfigured = () => {
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    return url && key && url !== 'https://placeholder.supabase.co' && key !== 'placeholder-key';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,15 +87,41 @@ const RegisterPage: React.FC = () => {
             <p className="text-gray-600 mt-2">Join HomeCrew to book professional services</p>
           </div>
 
+          {!isSupabaseConfigured() && (
+            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-6">
+              <div className="flex items-start space-x-3">
+                <Info className="w-5 h-5 text-blue-600 mt-0.5" />
+                <div className="text-sm">
+                  <p className="text-blue-800 font-medium">Demo Mode</p>
+                  <p className="text-blue-700">Registration will work in demo mode. You can then login with any credentials.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isSupabaseConfigured() && (
+            <div className="bg-green-50 border border-green-200 p-4 rounded-lg mb-6">
+              <div className="flex items-start space-x-3">
+                <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+                <div className="text-sm">
+                  <p className="text-green-800 font-medium">Email Verification Required</p>
+                  <p className="text-green-700">After registration, check your email for a verification link before logging in.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-              {error}
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-start space-x-3">
+              <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+              <span className="text-sm">{error}</span>
             </div>
           )}
 
           {success && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6">
-              {success}
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6 flex items-start space-x-3">
+              <CheckCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+              <span className="text-sm">{success}</span>
             </div>
           )}
 
@@ -119,6 +152,9 @@ const RegisterPage: React.FC = () => {
                 required
                 disabled={loading}
               />
+              {isSupabaseConfigured() && (
+                <p className="text-xs text-gray-500 mt-1">We'll send a verification email to this address</p>
+              )}
             </div>
 
             <div>
@@ -143,7 +179,7 @@ const RegisterPage: React.FC = () => {
                 value={formData.password}
                 onChange={handleChange}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Create a password"
+                placeholder="Create a password (min 6 characters)"
                 required
                 disabled={loading}
               />

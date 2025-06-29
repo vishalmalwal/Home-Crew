@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Users, Building, ArrowLeft, Info } from 'lucide-react';
+import { Users, Building, ArrowLeft, Info, AlertCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
@@ -39,6 +39,7 @@ const LoginPage: React.FC = () => {
     try {
       const success = await login(email, password, userType);
       if (success) {
+        // Navigate based on user type
         if (userType === 'customer') {
           navigate('/dashboard');
         } else {
@@ -46,7 +47,11 @@ const LoginPage: React.FC = () => {
         }
       } else {
         if (!isSupabaseConfigured()) {
-          setError('Demo mode: Invalid credentials. Try admin@homecrew.com / admin123 for company or any email for customer.');
+          if (userType === 'company') {
+            setError('Demo mode: Use admin@homecrew.com / admin123 for company login');
+          } else {
+            setError('Demo mode: Use any email/password for customer login');
+          }
         } else {
           setError('Invalid credentials. Please check your email and password.');
         }
@@ -72,7 +77,7 @@ const LoginPage: React.FC = () => {
                   <Info className="w-5 h-5 text-blue-600 mt-0.5" />
                   <div className="text-sm">
                     <p className="text-blue-800 font-medium">Demo Mode Active</p>
-                    <p className="text-blue-700">Supabase not configured. Using demo data.</p>
+                    <p className="text-blue-700">Supabase not configured. Using demo data for testing.</p>
                   </div>
                 </div>
               </div>
@@ -131,8 +136,9 @@ const LoginPage: React.FC = () => {
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-              {error}
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-start space-x-3">
+              <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+              <span className="text-sm">{error}</span>
             </div>
           )}
 
@@ -141,14 +147,14 @@ const LoginPage: React.FC = () => {
               <div className="flex items-start space-x-3">
                 <Info className="w-5 h-5 text-blue-600 mt-0.5" />
                 <div>
-                  <p className="text-blue-800 font-medium">Demo Mode</p>
+                  <p className="text-blue-800 font-medium">Demo Mode Credentials</p>
                   {userType === 'company' ? (
-                    <div className="text-blue-700">
-                      <p>Email: admin@homecrew.com</p>
-                      <p>Password: admin123</p>
+                    <div className="text-blue-700 mt-1">
+                      <p><strong>Email:</strong> admin@homecrew.com</p>
+                      <p><strong>Password:</strong> admin123</p>
                     </div>
                   ) : (
-                    <p className="text-blue-700">Use any email/password to login</p>
+                    <p className="text-blue-700 mt-1">Use any email/password combination to login</p>
                   )}
                 </div>
               </div>
@@ -180,7 +186,7 @@ const LoginPage: React.FC = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter your email"
+                placeholder={userType === 'company' && !isSupabaseConfigured() ? 'admin@homecrew.com' : 'Enter your email'}
                 required
                 disabled={loading}
               />
@@ -193,7 +199,7 @@ const LoginPage: React.FC = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter your password"
+                placeholder={userType === 'company' && !isSupabaseConfigured() ? 'admin123' : 'Enter your password'}
                 required
                 disabled={loading}
               />
