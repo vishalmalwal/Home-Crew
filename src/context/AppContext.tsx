@@ -44,47 +44,140 @@ export const PROBLEMS = {
   electrician: ['Wiring Issue', 'Fan Installation', 'Light Fitting', 'Switch Repair', 'Power Outage', 'Appliance Setup', 'Circuit Breaker', 'Socket Installation']
 };
 
+// Mock data for fallback when Supabase is not connected
+const mockWorkers: Worker[] = [
+  {
+    id: 'w1',
+    name: 'Rajesh Kumar',
+    phone: '+91-9876543210',
+    photo: '',
+    service: 'carpenter',
+    availability: true,
+    rating: 4.5,
+    total_ratings: 23,
+    city: 'Mumbai',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: 'w2',
+    name: 'Suresh Sharma',
+    phone: '+91-9876543211',
+    photo: '',
+    service: 'plumber',
+    availability: true,
+    rating: 4.2,
+    total_ratings: 18,
+    city: 'Delhi',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: 'w3',
+    name: 'Amit Patel',
+    phone: '+91-9876543212',
+    photo: '',
+    service: 'electrician',
+    availability: true,
+    rating: 4.8,
+    total_ratings: 31,
+    city: 'Bangalore',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: 'w4',
+    name: 'Vikram Singh',
+    phone: '+91-9876543213',
+    photo: '',
+    service: 'carpenter',
+    availability: true,
+    rating: 4.0,
+    total_ratings: 12,
+    city: 'Chennai',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: 'w5',
+    name: 'Ravi Gupta',
+    phone: '+91-9876543214',
+    photo: '',
+    service: 'plumber',
+    availability: true,
+    rating: 4.6,
+    total_ratings: 27,
+    city: 'Mumbai',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
 
   useEffect(() => {
-    // Check for existing session
-    const checkSession = async () => {
+    // Check Supabase connection and initialize
+    const initializeApp = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          setCurrentUser(session.user as User);
-          await refreshData();
+        // Test Supabase connection
+        const { data, error } = await supabase.from('workers').select('count').limit(1);
+        
+        if (!error) {
+          setIsSupabaseConnected(true);
+          // Check for existing session
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            setCurrentUser(session.user as User);
+            await refreshData();
+          } else {
+            // Load mock data for demo
+            setWorkers(mockWorkers);
+          }
+        } else {
+          console.warn('Supabase not connected, using mock data');
+          setWorkers(mockWorkers);
         }
       } catch (error) {
-        console.error('Error checking session:', error);
+        console.warn('Supabase connection failed, using mock data:', error);
+        setWorkers(mockWorkers);
       } finally {
         setLoading(false);
       }
     };
 
-    checkSession();
+    initializeApp();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setCurrentUser(session.user as User);
-        await refreshData();
-      } else {
-        setCurrentUser(null);
-        setWorkers([]);
-        setBookings([]);
-      }
-      setLoading(false);
-    });
+    // Listen for auth changes only if Supabase is connected
+    let subscription: any;
+    if (isSupabaseConnected) {
+      const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (session?.user) {
+          setCurrentUser(session.user as User);
+          await refreshData();
+        } else {
+          setCurrentUser(null);
+          setWorkers(mockWorkers);
+          setBookings([]);
+        }
+        setLoading(false);
+      });
+      subscription = authSubscription;
+    }
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => subscription?.unsubscribe();
+  }, [isSupabaseConnected]);
 
   const refreshData = async () => {
+    if (!isSupabaseConnected) {
+      setWorkers(mockWorkers);
+      return;
+    }
+
     try {
       // Always fetch workers (they should be visible to all authenticated users)
       const { data: workersData, error: workersError } = await supabase
@@ -94,8 +187,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (workersError) {
         console.error('Error fetching workers:', workersError);
+        setWorkers(mockWorkers);
       } else {
-        setWorkers(workersData || []);
+        setWorkers(workersData || mockWorkers);
       }
 
       // Fetch bookings based on user role
@@ -118,10 +212,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch (error) {
       console.error('Error refreshing data:', error);
+      setWorkers(mockWorkers);
     }
   };
 
   const login = async (email: string, password: string, role: 'customer' | 'company'): Promise<boolean> => {
+    if (!isSupabaseConnected) {
+      // Mock login for demo
+      if (role === 'company' && email === 'admin@homecrew.com' && password === 'admin123') {
+        const mockUser: User = {
+          id: 'admin-id',
+          email: 'admin@homecrew.com',
+          user_metadata: {
+            name: 'HomeCrew Admin',
+            phone: '+91-1234567890',
+            role: 'company'
+          }
+        };
+        setCurrentUser(mockUser);
+        return true;
+      } else if (role === 'customer' && email === 'customer@test.com' && password === 'test123') {
+        const mockUser: User = {
+          id: 'customer-id',
+          email: 'customer@test.com',
+          user_metadata: {
+            name: 'Test Customer',
+            phone: '+91-9876543210',
+            role: 'customer'
+          }
+        };
+        setCurrentUser(mockUser);
+        return true;
+      }
+      return false;
+    }
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -152,6 +277,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logout = async (): Promise<void> => {
+    if (!isSupabaseConnected) {
+      setCurrentUser(null);
+      setBookings([]);
+      return;
+    }
+
     try {
       await supabase.auth.signOut();
     } catch (error) {
@@ -160,6 +291,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const register = async (userData: { name: string; email: string; phone: string; password: string }): Promise<{ success: boolean; message: string }> => {
+    if (!isSupabaseConnected) {
+      return { 
+        success: true, 
+        message: 'Demo mode: Registration successful! Use customer@test.com / test123 to login.' 
+      };
+    }
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email: userData.email,
@@ -188,6 +326,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addWorker = async (workerData: Omit<Worker, 'id' | 'rating' | 'total_ratings' | 'created_at' | 'updated_at'>): Promise<void> => {
+    if (!isSupabaseConnected) {
+      const newWorker: Worker = {
+        ...workerData,
+        id: `w${Date.now()}`,
+        rating: 0,
+        total_ratings: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      setWorkers([...workers, newWorker]);
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('workers')
@@ -202,6 +353,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const removeWorker = async (workerId: string): Promise<void> => {
+    if (!isSupabaseConnected) {
+      setWorkers(workers.filter(w => w.id !== workerId));
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('workers')
@@ -217,6 +373,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateWorkerAvailability = async (workerId: string, availability: boolean): Promise<void> => {
+    if (!isSupabaseConnected) {
+      setWorkers(workers.map(w => 
+        w.id === workerId ? { ...w, availability } : w
+      ));
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('workers')
@@ -232,6 +395,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const createBooking = async (bookingData: Omit<Booking, 'id' | 'created_at' | 'status'>): Promise<string> => {
+    if (!isSupabaseConnected) {
+      const newBooking: Booking = {
+        ...bookingData,
+        id: `b${Date.now()}`,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+      setBookings([...bookings, newBooking]);
+      return newBooking.id;
+    }
+
     try {
       const { data, error } = await supabase
         .from('bookings')
@@ -249,6 +423,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const confirmBooking = async (bookingId: string): Promise<void> => {
+    if (!isSupabaseConnected) {
+      setBookings(bookings.map(b => 
+        b.id === bookingId 
+          ? { ...b, status: 'confirmed', confirmed_at: new Date().toISOString() }
+          : b
+      ));
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('bookings')
@@ -267,6 +450,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const completeBooking = async (bookingId: string): Promise<void> => {
+    if (!isSupabaseConnected) {
+      setBookings(bookings.map(b => 
+        b.id === bookingId 
+          ? { ...b, status: 'completed', completed_at: new Date().toISOString() }
+          : b
+      ));
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('bookings')
@@ -285,6 +477,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const rateWorker = async (bookingId: string, rating: number, review: string): Promise<void> => {
+    if (!isSupabaseConnected) {
+      setBookings(bookings.map(b => 
+        b.id === bookingId ? { ...b, rating, review } : b
+      ));
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('bookings')
