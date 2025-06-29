@@ -13,7 +13,7 @@ const Header: React.FC = () => {
   };
 
   // Company header - minimal with just logout
-  if (currentUser?.email === 'admin@homecrew.com') {
+  if (currentUser?.role === 'company') {
     return (
       <header className="bg-gradient-to-r from-orange-600 to-red-600 shadow-xl">
         <div className="max-w-7xl mx-auto px-4 py-4">
@@ -83,10 +83,10 @@ const Header: React.FC = () => {
                     <User className="w-4 h-4 text-white" />
                   </div>
                   <span className="text-sm font-medium text-gray-700">
-                    {currentUser.user_metadata?.name || currentUser.email}
+                    {currentUser.name || currentUser.email}
                   </span>
                 </div>
-                {currentUser.user_metadata?.role === 'customer' && (
+                {currentUser.role === 'customer' && (
                   <Link
                     to="/dashboard"
                     className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-200 font-medium"

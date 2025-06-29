@@ -40,7 +40,7 @@ const Router: React.FC = () => {
       )}
       
       {/* Customer routes */}
-      {currentUser && currentUser.email !== 'admin@homecrew.com' && (
+      {currentUser && currentUser.role === 'customer' && (
         <>
           <Route path="/about" element={<AboutPage />} />
           <Route path="/services" element={<ServicesPage />} />
@@ -50,16 +50,16 @@ const Router: React.FC = () => {
       )}
       
       {/* Company routes */}
-      {currentUser?.email === 'admin@homecrew.com' && (
+      {currentUser && currentUser.role === 'company' && (
         <Route path="/admin" element={<CompanyDashboard />} />
       )}
 
       {/* Redirect based on user role */}
-      {currentUser && currentUser.email !== 'admin@homecrew.com' && (
+      {currentUser && currentUser.role === 'customer' && (
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       )}
       
-      {currentUser?.email === 'admin@homecrew.com' && (
+      {currentUser && currentUser.role === 'company' && (
         <Route path="*" element={<Navigate to="/admin" replace />} />
       )}
 

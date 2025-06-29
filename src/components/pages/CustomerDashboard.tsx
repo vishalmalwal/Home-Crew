@@ -16,7 +16,7 @@ const CustomerDashboard: React.FC = () => {
     date: '',
     timeSlot: '',
     address: '',
-    customerName: currentUser?.user_metadata?.name || '',
+    customerName: currentUser?.name || '',
     customerPhone: '',
     customerEmail: currentUser?.email || '',
     isEmergency: false,
@@ -50,20 +50,20 @@ const CustomerDashboard: React.FC = () => {
       }
 
       const bookingId = await createBooking({
-        customer_id: currentUser!.id,
-        customer_name: bookingForm.customerName,
-        customer_phone: bookingForm.customerPhone,
-        customer_email: bookingForm.customerEmail,
-        worker_id: assignedWorker.id,
-        worker_name: assignedWorker.name,
+        customerId: currentUser!.id,
+        customerName: bookingForm.customerName,
+        customerPhone: bookingForm.customerPhone,
+        customerEmail: bookingForm.customerEmail,
+        workerId: assignedWorker.id,
+        workerName: assignedWorker.name,
         service: bookingForm.service,
         problem: bookingForm.problem,
         description: bookingForm.description,
         date: bookingForm.date,
-        time_slot: bookingForm.timeSlot,
+        timeSlot: bookingForm.timeSlot,
         address: bookingForm.address,
         city: bookingForm.city,
-        is_emergency: bookingForm.isEmergency
+        isEmergency: bookingForm.isEmergency
       });
 
       alert(`Booking request submitted! Booking ID: ${bookingId}. Please wait for company confirmation.`);
@@ -77,7 +77,7 @@ const CustomerDashboard: React.FC = () => {
         date: '',
         timeSlot: '',
         address: '',
-        customerName: currentUser?.user_metadata?.name || '',
+        customerName: currentUser?.name || '',
         customerPhone: '',
         customerEmail: currentUser?.email || '',
         isEmergency: false,
@@ -154,7 +154,7 @@ const CustomerDashboard: React.FC = () => {
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <h1 className="text-3xl font-bold text-gray-800">Customer Dashboard</h1>
-          <p className="text-gray-600 mt-2">Welcome back, {currentUser?.user_metadata?.name}!</p>
+          <p className="text-gray-600 mt-2">Welcome back, {currentUser?.name}!</p>
         </div>
       </div>
 
@@ -334,7 +334,7 @@ const CustomerDashboard: React.FC = () => {
                     <option value="">Auto-assign best available worker</option>
                     {availableWorkers.map(worker => (
                       <option key={worker.id} value={worker.id}>
-                        {worker.name} - ⭐ {worker.rating} ({worker.total_ratings} reviews)
+                        {worker.name} - ⭐ {worker.rating} ({worker.totalRatings} reviews)
                       </option>
                     ))}
                   </select>
@@ -383,7 +383,7 @@ const CustomerDashboard: React.FC = () => {
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <h3 className="font-semibold text-lg text-gray-800">{booking.service} - {booking.problem}</h3>
-                        <p className="text-gray-600">Worker: {booking.worker_name}</p>
+                        <p className="text-gray-600">Worker: {booking.workerName}</p>
                         <p className="text-sm text-gray-500">Booking ID: {booking.id}</p>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -401,13 +401,13 @@ const CustomerDashboard: React.FC = () => {
                     <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
                       <div className="flex items-center space-x-2">
                         <Calendar className="w-4 h-4" />
-                        <span>{booking.date} at {booking.time_slot}</span>
+                        <span>{booking.date} at {booking.timeSlot}</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <MapPin className="w-4 h-4" />
                         <span>{booking.city}</span>
                       </div>
-                      {booking.is_emergency && (
+                      {booking.isEmergency && (
                         <div className="flex items-center space-x-2">
                           <Clock className="w-4 h-4 text-orange-600" />
                           <span className="text-orange-600">Emergency Service</span>
@@ -464,7 +464,7 @@ const CustomerDashboard: React.FC = () => {
                   <option value="">Select a booking to rate</option>
                   {userBookings.filter(b => b.status === 'completed' && !b.rating).map(booking => (
                     <option key={booking.id} value={booking.id}>
-                      {booking.service} - {booking.worker_name} ({booking.date})
+                      {booking.service} - {booking.workerName} ({booking.date})
                     </option>
                   ))}
                 </select>
