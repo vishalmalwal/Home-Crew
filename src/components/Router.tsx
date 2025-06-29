@@ -4,7 +4,6 @@ import { useApp } from '../context/AppContext';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
-import VerifyEmailPage from './pages/VerifyEmailPage';
 import CustomerDashboard from './pages/CustomerDashboard';
 import CompanyDashboard from './pages/CompanyDashboard';
 import AboutPage from './pages/AboutPage';
@@ -26,12 +25,11 @@ const Router: React.FC = () => {
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/verify-email" element={<VerifyEmailPage />} />
         </>
       )}
       
       {/* Customer routes */}
-      {currentUser?.role === 'customer' && (
+      {currentUser?.user_metadata?.role === 'customer' && (
         <>
           <Route path="/about" element={<AboutPage />} />
           <Route path="/services" element={<ServicesPage />} />
@@ -41,16 +39,16 @@ const Router: React.FC = () => {
       )}
       
       {/* Company routes */}
-      {currentUser?.role === 'company' && (
+      {currentUser?.email === 'admin@homecrew.com' && (
         <Route path="/admin" element={<CompanyDashboard />} />
       )}
 
       {/* Redirect based on user role */}
-      {currentUser?.role === 'customer' && (
+      {currentUser?.user_metadata?.role === 'customer' && (
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       )}
       
-      {currentUser?.role === 'company' && (
+      {currentUser?.email === 'admin@homecrew.com' && (
         <Route path="*" element={<Navigate to="/admin" replace />} />
       )}
 

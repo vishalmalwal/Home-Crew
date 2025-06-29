@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Calendar, Star, Clock, MapPin, Phone, CheckCircle, AlertCircle } from 'lucide-react';
+import { Calendar, Star, Clock, MapPin, CheckCircle, AlertCircle } from 'lucide-react';
 import { useApp, INDIAN_CITIES, PROBLEMS } from '../../context/AppContext';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 
 const CustomerDashboard: React.FC = () => {
-  const { currentUser, createBooking, getUserBookings, getWorkersByCity, rateWorker, workers } = useApp();
+  const { currentUser, createBooking, getUserBookings, getWorkersByCity, rateWorker, workers, loading } = useApp();
   const [activeTab, setActiveTab] = useState<'book' | 'history' | 'rate'>('book');
+  const [submitting, setSubmitting] = useState(false);
   const [bookingForm, setBookingForm] = useState({
     service: '',
     problem: '',
@@ -15,7 +16,7 @@ const CustomerDashboard: React.FC = () => {
     date: '',
     timeSlot: '',
     address: '',
-    customerName: currentUser?.name || '',
+    customerName: currentUser?.user_metadata?.name || '',
     customerPhone: '',
     customerEmail: currentUser?.email || '',
     isEmergency: false,
@@ -30,63 +31,80 @@ const CustomerDashboard: React.FC = () => {
   const userBookings = currentUser ? getUserBookings(currentUser.id) : [];
   const availableWorkers = bookingForm.city ? getWorkersByCity(bookingForm.city, bookingForm.service || undefined) : [];
 
-  const handleBookingSubmit = (e: React.FormEvent) => {
+  const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
     
-    let assignedWorker;
-    if (bookingForm.preferredWorker) {
-      assignedWorker = workers.find(w => w.id === bookingForm.preferredWorker);
-    } else {
-      const availableOnes = getWorkersByCity(bookingForm.city, bookingForm.service);
-      assignedWorker = availableOnes[0];
+    try {
+      let assignedWorker;
+      if (bookingForm.preferredWorker) {
+        assignedWorker = workers.find(w => w.id === bookingForm.preferredWorker);
+      } else {
+        const availableOnes = getWorkersByCity(bookingForm.city, bookingForm.service);
+        assignedWorker = availableOnes[0];
+      }
+
+      if (!assignedWorker) {
+        alert('No workers available for this service in your city!');
+        return;
+      }
+
+      const bookingId = await createBooking({
+        customer_id: currentUser!.id,
+        customer_name: bookingForm.customerName,
+        customer_phone: bookingForm.customerPhone,
+        customer_email: bookingForm.customerEmail,
+        worker_id: assignedWorker.id,
+        worker_name: assignedWorker.name,
+        service: bookingForm.service,
+        problem: bookingForm.problem,
+        description: bookingForm.description,
+        date: bookingForm.date,
+        time_slot: bookingForm.timeSlot,
+        address: bookingForm.address,
+        city: bookingForm.city,
+        is_emergency: bookingForm.isEmergency
+      });
+
+      alert(`Booking request submitted! Booking ID: ${bookingId}. Please wait for company confirmation.`);
+      
+      // Reset form
+      setBookingForm({
+        service: '',
+        problem: '',
+        description: '',
+        city: '',
+        date: '',
+        timeSlot: '',
+        address: '',
+        customerName: currentUser?.user_metadata?.name || '',
+        customerPhone: '',
+        customerEmail: currentUser?.email || '',
+        isEmergency: false,
+        preferredWorker: ''
+      });
+    } catch (error) {
+      console.error('Error creating booking:', error);
+      alert('Failed to create booking. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
-
-    if (!assignedWorker) {
-      alert('No workers available for this service in your city!');
-      return;
-    }
-
-    const bookingId = createBooking({
-      customerId: currentUser!.id,
-      customerName: bookingForm.customerName,
-      customerPhone: bookingForm.customerPhone,
-      customerEmail: bookingForm.customerEmail,
-      workerId: assignedWorker.id,
-      workerName: assignedWorker.name,
-      service: bookingForm.service,
-      problem: bookingForm.problem,
-      description: bookingForm.description,
-      date: bookingForm.date,
-      timeSlot: bookingForm.timeSlot,
-      address: bookingForm.address,
-      city: bookingForm.city,
-      isEmergency: bookingForm.isEmergency
-    });
-
-    alert(`Booking request submitted! Booking ID: ${bookingId}. Please wait for company confirmation.`);
-    
-    // Reset form
-    setBookingForm({
-      service: '',
-      problem: '',
-      description: '',
-      city: '',
-      date: '',
-      timeSlot: '',
-      address: '',
-      customerName: currentUser?.name || '',
-      customerPhone: '',
-      customerEmail: currentUser?.email || '',
-      isEmergency: false,
-      preferredWorker: ''
-    });
   };
 
-  const handleRatingSubmit = (e: React.FormEvent) => {
+  const handleRatingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    rateWorker(ratingForm.bookingId, ratingForm.rating, ratingForm.review);
-    alert('Rating submitted successfully!');
-    setRatingForm({ bookingId: '', rating: 5, review: '' });
+    setSubmitting(true);
+    
+    try {
+      await rateWorker(ratingForm.bookingId, ratingForm.rating, ratingForm.review);
+      alert('Rating submitted successfully!');
+      setRatingForm({ bookingId: '', rating: 5, review: '' });
+    } catch (error) {
+      console.error('Error submitting rating:', error);
+      alert('Failed to submit rating. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const timeSlots = [
@@ -117,6 +135,17 @@ const CustomerDashboard: React.FC = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -125,7 +154,7 @@ const CustomerDashboard: React.FC = () => {
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <h1 className="text-3xl font-bold text-gray-800">Customer Dashboard</h1>
-          <p className="text-gray-600 mt-2">Welcome back, {currentUser?.name}!</p>
+          <p className="text-gray-600 mt-2">Welcome back, {currentUser?.user_metadata?.name}!</p>
         </div>
       </div>
 
@@ -182,6 +211,7 @@ const CustomerDashboard: React.FC = () => {
                     onChange={(e) => setBookingForm({ ...bookingForm, service: e.target.value, problem: '' })}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
+                    disabled={submitting}
                   >
                     <option value="">Select Service</option>
                     <option value="carpenter">Carpenter</option>
@@ -197,6 +227,7 @@ const CustomerDashboard: React.FC = () => {
                     onChange={(e) => setBookingForm({ ...bookingForm, city: e.target.value })}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
+                    disabled={submitting}
                   >
                     <option value="">Select City</option>
                     {INDIAN_CITIES.map(city => (
@@ -213,6 +244,7 @@ const CustomerDashboard: React.FC = () => {
                       onChange={(e) => setBookingForm({ ...bookingForm, problem: e.target.value })}
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       required
+                      disabled={submitting}
                     >
                       <option value="">Select Problem</option>
                       {PROBLEMS[bookingForm.service as keyof typeof PROBLEMS]?.map(problem => (
@@ -231,6 +263,7 @@ const CustomerDashboard: React.FC = () => {
                     min={new Date().toISOString().split('T')[0]}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
+                    disabled={submitting}
                   />
                 </div>
 
@@ -241,6 +274,7 @@ const CustomerDashboard: React.FC = () => {
                     onChange={(e) => setBookingForm({ ...bookingForm, timeSlot: e.target.value })}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
+                    disabled={submitting}
                   >
                     <option value="">Select Time</option>
                     {timeSlots.map(slot => (
@@ -258,6 +292,7 @@ const CustomerDashboard: React.FC = () => {
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="+91-XXXXXXXXXX"
                     required
+                    disabled={submitting}
                   />
                 </div>
               </div>
@@ -271,6 +306,7 @@ const CustomerDashboard: React.FC = () => {
                   rows={3}
                   placeholder="Enter your complete address including landmarks"
                   required
+                  disabled={submitting}
                 />
               </div>
 
@@ -282,6 +318,7 @@ const CustomerDashboard: React.FC = () => {
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   rows={3}
                   placeholder="Describe your problem in detail so the worker can bring appropriate tools"
+                  disabled={submitting}
                 />
               </div>
 
@@ -292,11 +329,12 @@ const CustomerDashboard: React.FC = () => {
                     value={bookingForm.preferredWorker}
                     onChange={(e) => setBookingForm({ ...bookingForm, preferredWorker: e.target.value })}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={submitting}
                   >
                     <option value="">Auto-assign best available worker</option>
                     {availableWorkers.map(worker => (
                       <option key={worker.id} value={worker.id}>
-                        {worker.name} - ⭐ {worker.rating} ({worker.totalRatings} reviews)
+                        {worker.name} - ⭐ {worker.rating} ({worker.total_ratings} reviews)
                       </option>
                     ))}
                   </select>
@@ -310,6 +348,7 @@ const CustomerDashboard: React.FC = () => {
                   checked={bookingForm.isEmergency}
                   onChange={(e) => setBookingForm({ ...bookingForm, isEmergency: e.target.checked })}
                   className="w-4 h-4"
+                  disabled={submitting}
                 />
                 <label htmlFor="emergency" className="text-sm">
                   Emergency Service (+₹100 extra charge)
@@ -318,9 +357,10 @@ const CustomerDashboard: React.FC = () => {
 
               <button
                 type="submit"
-                className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                disabled={submitting}
+                className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Submit Booking Request
+                {submitting ? 'Submitting...' : 'Submit Booking Request'}
               </button>
             </form>
           </div>
@@ -343,7 +383,7 @@ const CustomerDashboard: React.FC = () => {
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <h3 className="font-semibold text-lg text-gray-800">{booking.service} - {booking.problem}</h3>
-                        <p className="text-gray-600">Worker: {booking.workerName}</p>
+                        <p className="text-gray-600">Worker: {booking.worker_name}</p>
                         <p className="text-sm text-gray-500">Booking ID: {booking.id}</p>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -361,13 +401,13 @@ const CustomerDashboard: React.FC = () => {
                     <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
                       <div className="flex items-center space-x-2">
                         <Calendar className="w-4 h-4" />
-                        <span>{booking.date} at {booking.timeSlot}</span>
+                        <span>{booking.date} at {booking.time_slot}</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <MapPin className="w-4 h-4" />
                         <span>{booking.city}</span>
                       </div>
-                      {booking.isEmergency && (
+                      {booking.is_emergency && (
                         <div className="flex items-center space-x-2">
                           <Clock className="w-4 h-4 text-orange-600" />
                           <span className="text-orange-600">Emergency Service</span>
@@ -419,11 +459,12 @@ const CustomerDashboard: React.FC = () => {
                   onChange={(e) => setRatingForm({ ...ratingForm, bookingId: e.target.value })}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
+                  disabled={submitting}
                 >
                   <option value="">Select a booking to rate</option>
                   {userBookings.filter(b => b.status === 'completed' && !b.rating).map(booking => (
                     <option key={booking.id} value={booking.id}>
-                      {booking.service} - {booking.workerName} ({booking.date})
+                      {booking.service} - {booking.worker_name} ({booking.date})
                     </option>
                   ))}
                 </select>
@@ -440,6 +481,7 @@ const CustomerDashboard: React.FC = () => {
                       className={`text-3xl transition-colors ${
                         star <= ratingForm.rating ? 'text-yellow-500' : 'text-gray-300'
                       }`}
+                      disabled={submitting}
                     >
                       ★
                     </button>
@@ -455,14 +497,16 @@ const CustomerDashboard: React.FC = () => {
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   rows={4}
                   placeholder="Share your experience with the worker's service..."
+                  disabled={submitting}
                 />
               </div>
 
               <button
                 type="submit"
-                className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                disabled={submitting}
+                className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Submit Rating
+                {submitting ? 'Submitting...' : 'Submit Rating'}
               </button>
             </form>
           </div>

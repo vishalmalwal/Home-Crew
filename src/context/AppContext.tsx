@@ -1,70 +1,26 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-
-export interface Worker {
-  id: string;
-  name: string;
-  phone: string;
-  photo: string;
-  service: 'carpenter' | 'plumber' | 'electrician';
-  availability: boolean;
-  rating: number;
-  totalRatings: number;
-  city: string;
-}
-
-export interface Booking {
-  id: string;
-  customerId: string;
-  customerName: string;
-  customerPhone: string;
-  customerEmail: string;
-  workerId: string;
-  workerName: string;
-  service: string;
-  problem: string;
-  description: string;
-  date: string;
-  timeSlot: string;
-  address: string;
-  city: string;
-  isEmergency: boolean;
-  status: 'pending' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled';
-  rating?: number;
-  review?: string;
-  createdAt: string;
-  confirmedAt?: string;
-  completedAt?: string;
-}
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  role: 'customer' | 'company';
-  isVerified: boolean;
-  verificationCode?: string;
-}
+import { supabase, type Worker, type Booking, type User } from '../lib/supabase';
+import type { AuthError } from '@supabase/supabase-js';
 
 interface AppContextType {
   currentUser: User | null;
   workers: Worker[];
   bookings: Booking[];
-  pendingUsers: User[];
-  login: (email: string, password: string, role: 'customer' | 'company') => boolean;
-  logout: () => void;
-  register: (userData: Omit<User, 'id' | 'isVerified'>) => { success: boolean; message: string };
-  verifyEmail: (email: string, code: string) => boolean;
-  addWorker: (worker: Omit<Worker, 'id' | 'rating' | 'totalRatings'>) => void;
-  removeWorker: (workerId: string) => void;
-  updateWorkerAvailability: (workerId: string, availability: boolean) => void;
-  createBooking: (booking: Omit<Booking, 'id' | 'createdAt' | 'status'>) => string;
-  confirmBooking: (bookingId: string) => void;
-  completeBooking: (bookingId: string) => void;
-  rateWorker: (bookingId: string, rating: number, review: string) => void;
+  loading: boolean;
+  login: (email: string, password: string, role: 'customer' | 'company') => Promise<boolean>;
+  logout: () => Promise<void>;
+  register: (userData: { name: string; email: string; phone: string; password: string }) => Promise<{ success: boolean; message: string }>;
+  addWorker: (worker: Omit<Worker, 'id' | 'rating' | 'total_ratings' | 'created_at' | 'updated_at'>) => Promise<void>;
+  removeWorker: (workerId: string) => Promise<void>;
+  updateWorkerAvailability: (workerId: string, availability: boolean) => Promise<void>;
+  createBooking: (booking: Omit<Booking, 'id' | 'created_at' | 'status'>) => Promise<string>;
+  confirmBooking: (bookingId: string) => Promise<void>;
+  completeBooking: (bookingId: string) => Promise<void>;
+  rateWorker: (bookingId: string, rating: number, review: string) => Promise<void>;
   getWorkersByCity: (city: string, service?: string) => Worker[];
   getUserBookings: (userId: string) => Booking[];
   getPendingBookings: () => Booking[];
+  refreshData: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -89,255 +45,249 @@ export const PROBLEMS = {
   electrician: ['Wiring Issue', 'Fan Installation', 'Light Fitting', 'Switch Repair', 'Power Outage', 'Appliance Setup', 'Circuit Breaker', 'Socket Installation']
 };
 
-// Mock data with no photos
-const initialWorkers: Worker[] = [
-  {
-    id: 'HC01',
-    name: 'Rajesh Kumar',
-    phone: '+91-9876543210',
-    photo: '',
-    service: 'carpenter',
-    availability: true,
-    rating: 4.5,
-    totalRatings: 23,
-    city: 'Mumbai'
-  },
-  {
-    id: 'HC02',
-    name: 'Suresh Sharma',
-    phone: '+91-9876543211',
-    photo: '',
-    service: 'plumber',
-    availability: true,
-    rating: 4.2,
-    totalRatings: 18,
-    city: 'Delhi'
-  },
-  {
-    id: 'HC03',
-    name: 'Amit Patel',
-    phone: '+91-9876543212',
-    photo: '',
-    service: 'electrician',
-    availability: false,
-    rating: 4.8,
-    totalRatings: 31,
-    city: 'Bangalore'
-  },
-  {
-    id: 'HC04',
-    name: 'Vikram Singh',
-    phone: '+91-9876543213',
-    photo: '',
-    service: 'carpenter',
-    availability: true,
-    rating: 4.0,
-    totalRatings: 12,
-    city: 'Chennai'
-  }
-];
-
-// Mock email service
-const sendEmail = (to: string, subject: string, body: string) => {
-  console.log(`📧 Email sent to: ${to}`);
-  console.log(`📧 Subject: ${subject}`);
-  console.log(`📧 Body: ${body}`);
-  console.log('---');
-  
-  // Show browser alert to simulate email
-  alert(`📧 Email sent to ${to}\n\nSubject: ${subject}\n\n${body}`);
-};
-
-const generateVerificationCode = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
-
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [workers, setWorkers] = useState<Worker[]>(initialWorkers);
+  const [workers, setWorkers] = useState<Worker[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [pendingUsers, setPendingUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Load data from localStorage
-    const savedUser = localStorage.getItem('homecrew_user');
-    const savedWorkers = localStorage.getItem('homecrew_workers');
-    const savedBookings = localStorage.getItem('homecrew_bookings');
-    const savedPendingUsers = localStorage.getItem('homecrew_pending_users');
+    // Check for existing session
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setCurrentUser(session.user as User);
+          await refreshData();
+        }
+      } catch (error) {
+        console.error('Error checking session:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    if (savedUser) setCurrentUser(JSON.parse(savedUser));
-    if (savedWorkers) setWorkers(JSON.parse(savedWorkers));
-    if (savedBookings) setBookings(JSON.parse(savedBookings));
-    if (savedPendingUsers) setPendingUsers(JSON.parse(savedPendingUsers));
+    checkSession();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        setCurrentUser(session.user as User);
+        await refreshData();
+      } else {
+        setCurrentUser(null);
+        setWorkers([]);
+        setBookings([]);
+      }
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem('homecrew_workers', JSON.stringify(workers));
-  }, [workers]);
+  const refreshData = async () => {
+    try {
+      // Fetch workers
+      const { data: workersData, error: workersError } = await supabase
+        .from('workers')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-  useEffect(() => {
-    localStorage.setItem('homecrew_bookings', JSON.stringify(bookings));
-  }, [bookings]);
+      if (workersError) throw workersError;
+      setWorkers(workersData || []);
 
-  useEffect(() => {
-    localStorage.setItem('homecrew_pending_users', JSON.stringify(pendingUsers));
-  }, [pendingUsers]);
+      // Fetch bookings based on user role
+      if (currentUser) {
+        let bookingsQuery = supabase.from('bookings').select('*');
+        
+        if (currentUser.email !== 'admin@homecrew.com') {
+          bookingsQuery = bookingsQuery.eq('customer_id', currentUser.id);
+        }
 
-  const login = (email: string, password: string, role: 'customer' | 'company'): boolean => {
-    if (role === 'company' && email === 'admin@homecrew.com' && password === 'admin123') {
-      const user: User = {
-        id: 'company-admin',
-        name: 'HomeCrew Admin',
-        email: 'admin@homecrew.com',
-        phone: '+91-1234567890',
-        role: 'company',
-        isVerified: true
-      };
-      setCurrentUser(user);
-      localStorage.setItem('homecrew_user', JSON.stringify(user));
-      return true;
-    } else if (role === 'customer') {
-      // Check if user exists and is verified
-      const existingUser = pendingUsers.find(u => u.email === email && u.isVerified);
-      if (existingUser) {
-        setCurrentUser(existingUser);
-        localStorage.setItem('homecrew_user', JSON.stringify(existingUser));
+        const { data: bookingsData, error: bookingsError } = await bookingsQuery
+          .order('created_at', { ascending: false });
+
+        if (bookingsError) throw bookingsError;
+        setBookings(bookingsData || []);
+      }
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    }
+  };
+
+  const login = async (email: string, password: string, role: 'customer' | 'company'): Promise<boolean> => {
+    try {
+      if (role === 'company' && email === 'admin@homecrew.com') {
+        // Company admin login
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        if (error) throw error;
+        return true;
+      } else if (role === 'customer') {
+        // Customer login
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        if (error) throw error;
         return true;
       }
+      return false;
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
     }
-    return false;
   };
 
-  const logout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('homecrew_user');
-  };
-
-  const register = (userData: Omit<User, 'id' | 'isVerified'>): { success: boolean; message: string } => {
-    // Check if user already exists
-    const existingUser = pendingUsers.find(u => u.email === userData.email);
-    if (existingUser) {
-      if (existingUser.isVerified) {
-        return { success: false, message: 'User already exists and is verified. Please login.' };
-      } else {
-        return { success: false, message: 'User already registered. Please check your email for verification code.' };
-      }
+  const logout = async (): Promise<void> => {
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('Logout error:', error);
     }
-
-    const verificationCode = generateVerificationCode();
-    const user: User = {
-      ...userData,
-      id: `customer-${Date.now()}`,
-      isVerified: false,
-      verificationCode
-    };
-
-    setPendingUsers([...pendingUsers, user]);
-
-    // Send verification email
-    sendEmail(
-      userData.email,
-      'HomeCrew - Email Verification',
-      `Welcome to HomeCrew!\n\nYour verification code is: ${verificationCode}\n\nPlease enter this code on the verification page to complete your registration.\n\nThank you for choosing HomeCrew!`
-    );
-
-    return { success: true, message: 'Registration successful! Please check your email for verification code.' };
   };
 
-  const verifyEmail = (email: string, code: string): boolean => {
-    const userIndex = pendingUsers.findIndex(u => u.email === email && u.verificationCode === code);
-    if (userIndex !== -1) {
-      const updatedUsers = [...pendingUsers];
-      updatedUsers[userIndex] = { ...updatedUsers[userIndex], isVerified: true, verificationCode: undefined };
-      setPendingUsers(updatedUsers);
-      return true;
+  const register = async (userData: { name: string; email: string; phone: string; password: string }): Promise<{ success: boolean; message: string }> => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: userData.email,
+        password: userData.password,
+        options: {
+          data: {
+            name: userData.name,
+            phone: userData.phone,
+            role: 'customer'
+          }
+        }
+      });
+
+      if (error) throw error;
+
+      return { 
+        success: true, 
+        message: 'Registration successful! Please check your email to verify your account.' 
+      };
+    } catch (error: any) {
+      return { 
+        success: false, 
+        message: error.message || 'Registration failed. Please try again.' 
+      };
     }
-    return false;
   };
 
-  const addWorker = (workerData: Omit<Worker, 'id' | 'rating' | 'totalRatings'>) => {
-    const newId = `HC${String(workers.length + 1).padStart(2, '0')}`;
-    const newWorker: Worker = {
-      ...workerData,
-      id: newId,
-      rating: 0,
-      totalRatings: 0
-    };
-    setWorkers([...workers, newWorker]);
+  const addWorker = async (workerData: Omit<Worker, 'id' | 'rating' | 'total_ratings' | 'created_at' | 'updated_at'>): Promise<void> => {
+    try {
+      const { error } = await supabase
+        .from('workers')
+        .insert([workerData]);
+
+      if (error) throw error;
+      await refreshData();
+    } catch (error) {
+      console.error('Error adding worker:', error);
+      throw error;
+    }
   };
 
-  const removeWorker = (workerId: string) => {
-    setWorkers(workers.filter(w => w.id !== workerId));
+  const removeWorker = async (workerId: string): Promise<void> => {
+    try {
+      const { error } = await supabase
+        .from('workers')
+        .delete()
+        .eq('id', workerId);
+
+      if (error) throw error;
+      await refreshData();
+    } catch (error) {
+      console.error('Error removing worker:', error);
+      throw error;
+    }
   };
 
-  const updateWorkerAvailability = (workerId: string, availability: boolean) => {
-    setWorkers(workers.map(w => 
-      w.id === workerId ? { ...w, availability } : w
-    ));
+  const updateWorkerAvailability = async (workerId: string, availability: boolean): Promise<void> => {
+    try {
+      const { error } = await supabase
+        .from('workers')
+        .update({ availability, updated_at: new Date().toISOString() })
+        .eq('id', workerId);
+
+      if (error) throw error;
+      await refreshData();
+    } catch (error) {
+      console.error('Error updating worker availability:', error);
+      throw error;
+    }
   };
 
-  const createBooking = (bookingData: Omit<Booking, 'id' | 'createdAt' | 'status'>): string => {
-    const bookingId = `BK${Date.now()}`;
-    const newBooking: Booking = {
-      ...bookingData,
-      id: bookingId,
-      createdAt: new Date().toISOString(),
-      status: 'pending'
-    };
-    setBookings([...bookings, newBooking]);
-    return bookingId;
+  const createBooking = async (bookingData: Omit<Booking, 'id' | 'created_at' | 'status'>): Promise<string> => {
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .insert([{ ...bookingData, status: 'pending' }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      await refreshData();
+      return data.id;
+    } catch (error) {
+      console.error('Error creating booking:', error);
+      throw error;
+    }
   };
 
-  const confirmBooking = (bookingId: string) => {
-    const booking = bookings.find(b => b.id === bookingId);
-    if (!booking) return;
+  const confirmBooking = async (bookingId: string): Promise<void> => {
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ 
+          status: 'confirmed', 
+          confirmed_at: new Date().toISOString() 
+        })
+        .eq('id', bookingId);
 
-    setBookings(bookings.map(b => 
-      b.id === bookingId 
-        ? { ...b, status: 'confirmed' as const, confirmedAt: new Date().toISOString() }
-        : b
-    ));
-
-    // Get worker phone number
-    const worker = workers.find(w => w.id === booking.workerId);
-    const workerPhone = worker ? worker.phone : 'Contact company for details';
-
-    // Send confirmation email to customer
-    sendEmail(
-      booking.customerEmail,
-      'HomeCrew - Booking Confirmed ✅',
-      `Your booking has been confirmed!\n\nBooking Details:\n• Booking ID: ${bookingId}\n• Service: ${booking.service} - ${booking.problem}\n• Worker: ${booking.workerName}\n• Worker Phone: ${workerPhone}\n• Date: ${booking.date}\n• Time: ${booking.timeSlot}\n• Address: ${booking.address}\n\nThe worker will arrive at your location on the scheduled time. Please ensure someone is available to receive the service.\n\nThank you for choosing HomeCrew!`
-    );
+      if (error) throw error;
+      await refreshData();
+    } catch (error) {
+      console.error('Error confirming booking:', error);
+      throw error;
+    }
   };
 
-  const completeBooking = (bookingId: string) => {
-    setBookings(bookings.map(b => 
-      b.id === bookingId 
-        ? { ...b, status: 'completed' as const, completedAt: new Date().toISOString() }
-        : b
-    ));
+  const completeBooking = async (bookingId: string): Promise<void> => {
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ 
+          status: 'completed', 
+          completed_at: new Date().toISOString() 
+        })
+        .eq('id', bookingId);
+
+      if (error) throw error;
+      await refreshData();
+    } catch (error) {
+      console.error('Error completing booking:', error);
+      throw error;
+    }
   };
 
-  const rateWorker = (bookingId: string, rating: number, review: string) => {
-    const booking = bookings.find(b => b.id === bookingId);
-    if (!booking) return;
+  const rateWorker = async (bookingId: string, rating: number, review: string): Promise<void> => {
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ rating, review })
+        .eq('id', bookingId);
 
-    // Update booking with rating
-    setBookings(bookings.map(b => 
-      b.id === bookingId ? { ...b, rating, review } : b
-    ));
-
-    // Update worker rating
-    const worker = workers.find(w => w.id === booking.workerId);
-    if (worker) {
-      const newTotalRatings = worker.totalRatings + 1;
-      const newRating = ((worker.rating * worker.totalRatings) + rating) / newTotalRatings;
-      
-      setWorkers(workers.map(w => 
-        w.id === worker.id 
-          ? { ...w, rating: Number(newRating.toFixed(1)), totalRatings: newTotalRatings }
-          : w
-      ));
+      if (error) throw error;
+      await refreshData();
+    } catch (error) {
+      console.error('Error rating worker:', error);
+      throw error;
     }
   };
 
@@ -350,7 +300,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const getUserBookings = (userId: string): Booking[] => {
-    return bookings.filter(b => b.customerId === userId);
+    return bookings.filter(b => b.customer_id === userId);
   };
 
   const getPendingBookings = (): Booking[] => {
@@ -362,11 +312,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       currentUser,
       workers,
       bookings,
-      pendingUsers,
+      loading,
       login,
       logout,
       register,
-      verifyEmail,
       addWorker,
       removeWorker,
       updateWorkerAvailability,
@@ -376,7 +325,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       rateWorker,
       getWorkersByCity,
       getUserBookings,
-      getPendingBookings
+      getPendingBookings,
+      refreshData
     }}>
       {children}
     </AppContext.Provider>

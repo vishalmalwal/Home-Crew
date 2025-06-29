@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Users, Plus, Trash2, ToggleLeft as Toggle, Star, CheckCircle, Clock, AlertCircle } from 'lucide-react';
-import { useApp, Worker, INDIAN_CITIES } from '../../context/AppContext';
+import { useApp, INDIAN_CITIES } from '../../context/AppContext';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 
 const CompanyDashboard: React.FC = () => {
-  const { workers, addWorker, removeWorker, updateWorkerAvailability, bookings, confirmBooking, completeBooking, getPendingBookings } = useApp();
-  const [activeTab, setActiveTab] = useState<'workers' | 'bookings' | 'pending' | 'add'>('pending');
+  const { workers, addWorker, removeWorker, updateWorkerAvailability, bookings, confirmBooking, completeBooking, getPendingBookings, loading } = useApp();
+  const [activeTab, setActiveTab] = useState<'pending' | 'bookings' | 'workers' | 'add'>('pending');
+  const [submitting, setSubmitting] = useState(false);
   const [newWorker, setNewWorker] = useState({
     name: '',
     phone: '',
@@ -18,50 +19,91 @@ const CompanyDashboard: React.FC = () => {
 
   const pendingBookings = getPendingBookings();
 
-  const handleAddWorker = (e: React.FormEvent) => {
+  const handleAddWorker = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newWorker.name || !newWorker.phone || !newWorker.service || !newWorker.city) {
       alert('Please fill all required fields');
       return;
     }
 
-    addWorker({
-      ...newWorker,
-      photo: newWorker.photo || ''
-    });
+    setSubmitting(true);
+    try {
+      await addWorker({
+        ...newWorker,
+        photo: newWorker.photo || ''
+      });
 
-    alert('Worker added successfully!');
-    setNewWorker({
-      name: '',
-      phone: '',
-      photo: '',
-      service: '' as any,
-      city: '',
-      availability: true
-    });
+      alert('Worker added successfully!');
+      setNewWorker({
+        name: '',
+        phone: '',
+        photo: '',
+        service: '' as any,
+        city: '',
+        availability: true
+      });
+    } catch (error) {
+      console.error('Error adding worker:', error);
+      alert('Failed to add worker. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleRemoveWorker = (workerId: string) => {
+  const handleRemoveWorker = async (workerId: string) => {
     if (confirm('Are you sure you want to remove this worker?')) {
-      removeWorker(workerId);
+      setSubmitting(true);
+      try {
+        await removeWorker(workerId);
+        alert('Worker removed successfully!');
+      } catch (error) {
+        console.error('Error removing worker:', error);
+        alert('Failed to remove worker. Please try again.');
+      } finally {
+        setSubmitting(false);
+      }
     }
   };
 
-  const toggleWorkerAvailability = (workerId: string, currentAvailability: boolean) => {
-    updateWorkerAvailability(workerId, !currentAvailability);
+  const toggleWorkerAvailability = async (workerId: string, currentAvailability: boolean) => {
+    setSubmitting(true);
+    try {
+      await updateWorkerAvailability(workerId, !currentAvailability);
+    } catch (error) {
+      console.error('Error updating worker availability:', error);
+      alert('Failed to update worker availability. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleConfirmBooking = (bookingId: string) => {
+  const handleConfirmBooking = async (bookingId: string) => {
     if (confirm('Confirm this booking?')) {
-      confirmBooking(bookingId);
-      alert('Booking confirmed! Customer has been notified via email.');
+      setSubmitting(true);
+      try {
+        await confirmBooking(bookingId);
+        alert('Booking confirmed! Customer has been notified.');
+      } catch (error) {
+        console.error('Error confirming booking:', error);
+        alert('Failed to confirm booking. Please try again.');
+      } finally {
+        setSubmitting(false);
+      }
     }
   };
 
-  const handleCompleteBooking = (bookingId: string) => {
+  const handleCompleteBooking = async (bookingId: string) => {
     if (confirm('Mark this booking as completed?')) {
-      completeBooking(bookingId);
-      alert('Booking marked as completed!');
+      setSubmitting(true);
+      try {
+        await completeBooking(bookingId);
+        alert('Booking marked as completed!');
+      } catch (error) {
+        console.error('Error completing booking:', error);
+        alert('Failed to complete booking. Please try again.');
+      } finally {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -84,6 +126,17 @@ const CompanyDashboard: React.FC = () => {
       default: return <Clock className="w-4 h-4" />;
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -169,9 +222,9 @@ const CompanyDashboard: React.FC = () => {
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <h3 className="font-semibold text-lg text-gray-800">{booking.service} - {booking.problem}</h3>
-                        <p className="text-gray-600">Customer: {booking.customerName}</p>
-                        <p className="text-gray-600">Phone: {booking.customerPhone}</p>
-                        <p className="text-gray-600">Assigned Worker: {booking.workerName}</p>
+                        <p className="text-gray-600">Customer: {booking.customer_name}</p>
+                        <p className="text-gray-600">Phone: {booking.customer_phone}</p>
+                        <p className="text-gray-600">Assigned Worker: {booking.worker_name}</p>
                         <p className="text-sm text-gray-500">Booking ID: {booking.id}</p>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -184,9 +237,9 @@ const CompanyDashboard: React.FC = () => {
                     
                     <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
                       <div><strong>Date:</strong> {booking.date}</div>
-                      <div><strong>Time:</strong> {booking.timeSlot}</div>
+                      <div><strong>Time:</strong> {booking.time_slot}</div>
                       <div><strong>City:</strong> {booking.city}</div>
-                      <div><strong>Emergency:</strong> {booking.isEmergency ? 'Yes (+₹100)' : 'No'}</div>
+                      <div><strong>Emergency:</strong> {booking.is_emergency ? 'Yes (+₹100)' : 'No'}</div>
                     </div>
                     
                     <div className="mb-4">
@@ -203,13 +256,15 @@ const CompanyDashboard: React.FC = () => {
                     <div className="flex space-x-4">
                       <button
                         onClick={() => handleConfirmBooking(booking.id)}
-                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                        disabled={submitting}
+                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Confirm Booking
                       </button>
                       <button
                         onClick={() => completeBooking(booking.id)}
-                        className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium"
+                        disabled={submitting}
+                        className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Reject Booking
                       </button>
@@ -248,14 +303,14 @@ const CompanyDashboard: React.FC = () => {
                   <tbody>
                     {bookings.map(booking => (
                       <tr key={booking.id} className="hover:bg-gray-50">
-                        <td className="border border-gray-300 px-4 py-3 font-semibold">{booking.id}</td>
+                        <td className="border border-gray-300 px-4 py-3 font-semibold">{booking.id.slice(0, 8)}...</td>
                         <td className="border border-gray-300 px-4 py-3">
                           <div>
-                            <div className="font-medium">{booking.customerName}</div>
-                            <div className="text-sm text-gray-600">{booking.customerPhone}</div>
+                            <div className="font-medium">{booking.customer_name}</div>
+                            <div className="text-sm text-gray-600">{booking.customer_phone}</div>
                           </div>
                         </td>
-                        <td className="border border-gray-300 px-4 py-3">{booking.workerName}</td>
+                        <td className="border border-gray-300 px-4 py-3">{booking.worker_name}</td>
                         <td className="border border-gray-300 px-4 py-3">
                           <div>
                             <div className="font-medium">{booking.service}</div>
@@ -265,7 +320,7 @@ const CompanyDashboard: React.FC = () => {
                         <td className="border border-gray-300 px-4 py-3">
                           <div>
                             <div>{booking.date}</div>
-                            <div className="text-sm text-gray-600">{booking.timeSlot}</div>
+                            <div className="text-sm text-gray-600">{booking.time_slot}</div>
                           </div>
                         </td>
                         <td className="border border-gray-300 px-4 py-3">{booking.city}</td>
@@ -280,7 +335,7 @@ const CompanyDashboard: React.FC = () => {
                                booking.status}
                             </span>
                           </div>
-                          {booking.isEmergency && (
+                          {booking.is_emergency && (
                             <span className="inline-block mt-1 px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800">
                               Emergency
                             </span>
@@ -291,7 +346,8 @@ const CompanyDashboard: React.FC = () => {
                             {booking.status === 'pending' && (
                               <button
                                 onClick={() => handleConfirmBooking(booking.id)}
-                                className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors"
+                                disabled={submitting}
+                                className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 Confirm
                               </button>
@@ -299,7 +355,8 @@ const CompanyDashboard: React.FC = () => {
                             {booking.status === 'confirmed' && (
                               <button
                                 onClick={() => handleCompleteBooking(booking.id)}
-                                className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors"
+                                disabled={submitting}
+                                className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 Complete
                               </button>
@@ -336,7 +393,7 @@ const CompanyDashboard: React.FC = () => {
                 <tbody>
                   {workers.map(worker => (
                     <tr key={worker.id} className="hover:bg-gray-50">
-                      <td className="border border-gray-300 px-4 py-3 font-semibold">{worker.id}</td>
+                      <td className="border border-gray-300 px-4 py-3 font-semibold">{worker.id.slice(0, 8)}...</td>
                       <td className="border border-gray-300 px-4 py-3">{worker.name}</td>
                       <td className="border border-gray-300 px-4 py-3 capitalize">{worker.service}</td>
                       <td className="border border-gray-300 px-4 py-3">{worker.city}</td>
@@ -344,7 +401,7 @@ const CompanyDashboard: React.FC = () => {
                       <td className="border border-gray-300 px-4 py-3">
                         <div className="flex items-center space-x-1">
                           <Star className="w-4 h-4 text-yellow-500" />
-                          <span>{worker.rating.toFixed(1)} ({worker.totalRatings})</span>
+                          <span>{worker.rating.toFixed(1)} ({worker.total_ratings})</span>
                         </div>
                       </td>
                       <td className="border border-gray-300 px-4 py-3">
@@ -360,14 +417,16 @@ const CompanyDashboard: React.FC = () => {
                         <div className="flex space-x-2">
                           <button
                             onClick={() => toggleWorkerAvailability(worker.id, worker.availability)}
-                            className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition-colors"
+                            disabled={submitting}
+                            className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Toggle Availability"
                           >
                             <Toggle className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleRemoveWorker(worker.id)}
-                            className="bg-red-600 text-white p-2 rounded hover:bg-red-700 transition-colors"
+                            disabled={submitting}
+                            className="bg-red-600 text-white p-2 rounded hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Remove Worker"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -396,6 +455,7 @@ const CompanyDashboard: React.FC = () => {
                     onChange={(e) => setNewWorker({ ...newWorker, name: e.target.value })}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                     required
+                    disabled={submitting}
                   />
                 </div>
 
@@ -408,6 +468,7 @@ const CompanyDashboard: React.FC = () => {
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                     placeholder="+91-XXXXXXXXXX"
                     required
+                    disabled={submitting}
                   />
                 </div>
 
@@ -418,6 +479,7 @@ const CompanyDashboard: React.FC = () => {
                     onChange={(e) => setNewWorker({ ...newWorker, service: e.target.value as any })}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                     required
+                    disabled={submitting}
                   >
                     <option value="">Select Service</option>
                     <option value="carpenter">Carpenter</option>
@@ -433,6 +495,7 @@ const CompanyDashboard: React.FC = () => {
                     onChange={(e) => setNewWorker({ ...newWorker, city: e.target.value })}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                     required
+                    disabled={submitting}
                   >
                     <option value="">Select City</option>
                     {INDIAN_CITIES.map(city => (
@@ -449,6 +512,7 @@ const CompanyDashboard: React.FC = () => {
                     onChange={(e) => setNewWorker({ ...newWorker, photo: e.target.value })}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                     placeholder="https://example.com/photo.jpg"
+                    disabled={submitting}
                   />
                   <p className="text-sm text-gray-500 mt-1">Leave empty if no photo available</p>
                 </div>
@@ -460,6 +524,7 @@ const CompanyDashboard: React.FC = () => {
                       checked={newWorker.availability}
                       onChange={(e) => setNewWorker({ ...newWorker, availability: e.target.checked })}
                       className="w-4 h-4"
+                      disabled={submitting}
                     />
                     <span className="text-sm">Worker is available for work</span>
                   </label>
@@ -468,10 +533,11 @@ const CompanyDashboard: React.FC = () => {
 
               <button
                 type="submit"
-                className="bg-orange-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-orange-700 transition-colors flex items-center space-x-2"
+                disabled={submitting}
+                className="bg-orange-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-orange-700 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Plus className="w-5 h-5" />
-                <span>Add Worker</span>
+                <span>{submitting ? 'Adding...' : 'Add Worker'}</span>
               </button>
             </form>
           </div>
