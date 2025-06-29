@@ -11,7 +11,18 @@ import ServicesPage from './pages/ServicesPage';
 import ContactPage from './pages/ContactPage';
 
 const Router: React.FC = () => {
-  const { currentUser } = useApp();
+  const { currentUser, loading } = useApp();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Routes>
@@ -29,7 +40,7 @@ const Router: React.FC = () => {
       )}
       
       {/* Customer routes */}
-      {currentUser?.user_metadata?.role === 'customer' && (
+      {currentUser && currentUser.email !== 'admin@homecrew.com' && (
         <>
           <Route path="/about" element={<AboutPage />} />
           <Route path="/services" element={<ServicesPage />} />
@@ -44,7 +55,7 @@ const Router: React.FC = () => {
       )}
 
       {/* Redirect based on user role */}
-      {currentUser?.user_metadata?.role === 'customer' && (
+      {currentUser && currentUser.email !== 'admin@homecrew.com' && (
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       )}
       

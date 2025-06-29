@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, type Worker, type Booking, type User } from '../lib/supabase';
-import type { AuthError } from '@supabase/supabase-js';
 
 interface AppContextType {
   currentUser: User | null;
@@ -87,19 +86,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const refreshData = async () => {
     try {
-      // Fetch workers
+      // Always fetch workers (they should be visible to all authenticated users)
       const { data: workersData, error: workersError } = await supabase
         .from('workers')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (workersError) throw workersError;
-      setWorkers(workersData || []);
+      if (workersError) {
+        console.error('Error fetching workers:', workersError);
+      } else {
+        setWorkers(workersData || []);
+      }
 
       // Fetch bookings based on user role
       if (currentUser) {
         let bookingsQuery = supabase.from('bookings').select('*');
         
+        // If not admin, only show user's own bookings
         if (currentUser.email !== 'admin@homecrew.com') {
           bookingsQuery = bookingsQuery.eq('customer_id', currentUser.id);
         }
@@ -107,8 +110,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const { data: bookingsData, error: bookingsError } = await bookingsQuery
           .order('created_at', { ascending: false });
 
-        if (bookingsError) throw bookingsError;
-        setBookings(bookingsData || []);
+        if (bookingsError) {
+          console.error('Error fetching bookings:', bookingsError);
+        } else {
+          setBookings(bookingsData || []);
+        }
       }
     } catch (error) {
       console.error('Error refreshing data:', error);
@@ -117,26 +123,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const login = async (email: string, password: string, role: 'customer' | 'company'): Promise<boolean> => {
     try {
-      if (role === 'company' && email === 'admin@homecrew.com') {
-        // Company admin login
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
 
-        if (error) throw error;
-        return true;
-      } else if (role === 'customer') {
-        // Customer login
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
-
-        if (error) throw error;
-        return true;
+      if (error) {
+        console.error('Login error:', error);
+        return false;
       }
-      return false;
+
+      // Check role after successful login
+      if (role === 'company' && email !== 'admin@homecrew.com') {
+        await supabase.auth.signOut();
+        return false;
+      }
+
+      if (role === 'customer' && email === 'admin@homecrew.com') {
+        await supabase.auth.signOut();
+        return false;
+      }
+
+      return true;
     } catch (error) {
       console.error('Login error:', error);
       return false;
