@@ -66,8 +66,8 @@ const LandingPage: React.FC = () => {
               <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link
-              to="/login"
-              className="group bg-white text-gray-700 px-8 py-4 rounded-2xl font-semibold hover:bg-gray-50 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 border border-gray-200 flex items-center justify-center"
+              to="/login?type=company"
+              className="group bg-gradient-to-r from-orange-600 to-red-600 text-white px-8 py-4 rounded-2xl font-semibold hover:from-orange-700 hover:to-red-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 flex items-center justify-center"
             >
               <Building className="w-6 h-6 mr-2" />
               Company Login
@@ -228,7 +228,7 @@ const LandingPage: React.FC = () => {
               Book Your First Service
             </Link>
             <Link
-              to="/login"
+              to="/login?type=company"
               className="bg-white/20 backdrop-blur-sm text-white px-8 py-4 rounded-2xl font-semibold hover:bg-white/30 transition-colors duration-200 border border-white/30"
             >
               Company Portal

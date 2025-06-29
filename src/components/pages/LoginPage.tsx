@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Users, Building, ArrowLeft } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 
 const LoginPage: React.FC = () => {
-  const [userType, setUserType] = useState<'customer' | 'company' | null>(null);
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const initialUserType = searchParams.get('type') as 'customer' | 'company' | null;
+  
+  const [userType, setUserType] = useState<'customer' | 'company' | null>(initialUserType);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -54,7 +58,7 @@ const LoginPage: React.FC = () => {
             <div className="space-y-4">
               <button
                 onClick={() => setUserType('customer')}
-                className="w-full bg-blue-600 text-white p-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center space-x-3"
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-200 flex items-center justify-center space-x-3 transform hover:scale-105"
               >
                 <Users className="w-6 h-6" />
                 <span>Customer Login</span>
@@ -62,7 +66,7 @@ const LoginPage: React.FC = () => {
               
               <button
                 onClick={() => setUserType('company')}
-                className="w-full bg-orange-600 text-white p-4 rounded-lg font-semibold hover:bg-orange-700 transition-colors flex items-center justify-center space-x-3"
+                className="w-full bg-gradient-to-r from-orange-600 to-red-600 text-white p-4 rounded-xl font-semibold hover:from-orange-700 hover:to-red-700 transition-all duration-200 flex items-center justify-center space-x-3 transform hover:scale-105"
               >
                 <Building className="w-6 h-6" />
                 <span>Company Login</span>
@@ -90,9 +94,9 @@ const LoginPage: React.FC = () => {
           <div className="text-center mb-8">
             <div className={`w-16 h-16 ${userType === 'customer' ? 'bg-blue-100' : 'bg-orange-100'} rounded-full flex items-center justify-center mx-auto mb-4`}>
               {userType === 'customer' ? (
-                <Users className={`w-8 h-8 ${userType === 'customer' ? 'text-blue-600' : 'text-orange-600'}`} />
+                <Users className="w-8 h-8 text-blue-600" />
               ) : (
-                <Building className={`w-8 h-8 ${userType === 'customer' ? 'text-blue-600' : 'text-orange-600'}`} />
+                <Building className="w-8 h-8 text-orange-600" />
               )}
             </div>
             <h2 className="text-3xl font-bold text-gray-800">
@@ -103,17 +107,27 @@ const LoginPage: React.FC = () => {
             </p>
           </div>
 
-          {userType === 'company' && (
-            <div className="bg-orange-50 p-4 rounded-lg mb-6 text-sm">
-              <p><strong>Demo Credentials:</strong></p>
-              <p>Email: admin@homecrew.com</p>
-              <p>Password: admin123</p>
-            </div>
-          )}
-
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
               {error}
+            </div>
+          )}
+
+          {userType === 'company' && (
+            <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg mb-6 text-sm">
+              <p className="text-orange-800"><strong>Demo Company Login:</strong></p>
+              <p className="text-orange-700">Email: admin@homecrew.com</p>
+              <p className="text-orange-700">Password: admin123</p>
+            </div>
+          )}
+
+          {userType === 'customer' && (
+            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-6 text-sm">
+              <p className="text-blue-800"><strong>Customer Registration:</strong></p>
+              <p className="text-blue-700">New customers can register for free!</p>
+              <Link to="/register" className="text-blue-600 hover:text-blue-800 font-medium">
+                Create your account here →
+              </Link>
             </div>
           )}
 
@@ -147,7 +161,7 @@ const LoginPage: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className={`w-full ${userType === 'customer' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700'} text-white py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
+              className={`w-full ${userType === 'customer' ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700' : 'bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700'} text-white py-3 rounded-lg font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {loading ? 'Logging in...' : 'Login'}
             </button>
